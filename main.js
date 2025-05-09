@@ -401,6 +401,67 @@ function createHtml() {
       .notification.show {
         opacity: 1;
       }
+      .db-container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+      }
+      .db-query-container {
+        display: flex;
+        margin-bottom: 10px;
+      }
+      .db-query-container input {
+        flex-grow: 1;
+        margin-right: 10px;
+        margin-bottom: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tr:hover {
+        background-color: #f1f1f1;
+      }
+      .db-table-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .tab-container {
+        margin-bottom: 10px;
+      }
+      .tab-button {
+        background-color: #f1f1f1;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 10px 15px;
+        transition: 0.3s;
+        border-radius: 4px 4px 0 0;
+        margin-right: 2px;
+      }
+      .tab-button:hover {
+        background-color: #ddd;
+      }
+      .tab-button.active {
+        background-color: #4CAF50;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -423,6 +484,45 @@ function createHtml() {
       <h3>历史记录:</h3>
       <div id="history"></div>
     </div>
+    
+    <!-- 数据库查询模块 -->
+    <div id="db-container" class="db-container">
+      <h3>数据库查询:</h3>
+      <div class="tab-container">
+        <button id="tab-predefined" class="tab-button active">预定义查询</button>
+        <button id="tab-custom" class="tab-button">自定义SQL</button>
+      </div>
+      
+      <div id="predefined-queries" class="query-panel">
+        <button id="query-recent" class="query-btn">最近10条记录</button>
+        <button id="query-count" class="query-btn">记录总数</button>
+        <input type="text" id="search-term" placeholder="搜索关键词">
+        <button id="query-search" class="query-btn">搜索</button>
+      </div>
+      
+      <div id="custom-query" class="query-panel" style="display:none">
+        <div class="db-query-container">
+          <input type="text" id="sql-input" placeholder="输入SQL查询语句，例如: SELECT * FROM calls LIMIT 5">
+          <button id="run-sql-btn">执行查询</button>
+        </div>
+      </div>
+      
+      <div class="db-table-container">
+        <table id="db-results">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>调用字符串</th>
+              <th>结果</th>
+            </tr>
+          </thead>
+          <tbody id="db-results-body">
+            <!-- 查询结果将在这里显示 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
     <div id="notification" class="notification"></div>
 
     <script>
@@ -434,6 +534,145 @@ function createHtml() {
         const modulesListDiv = document.getElementById('modules-list');
         const wsStatusIndicator = document.getElementById('ws-status');
         const notificationDiv = document.getElementById('notification');
+        
+        // 数据库查询相关元素
+        const tabPredefined = document.getElementById('tab-predefined');
+        const tabCustom = document.getElementById('tab-custom');
+        const predefinedQueries = document.getElementById('predefined-queries');
+        const customQuery = document.getElementById('custom-query');
+        const sqlInput = document.getElementById('sql-input');
+        const runSqlBtn = document.getElementById('run-sql-btn');
+        const dbResultsBody = document.getElementById('db-results-body');
+        const queryRecentBtn = document.getElementById('query-recent');
+        const queryCountBtn = document.getElementById('query-count');
+        const querySearchBtn = document.getElementById('query-search');
+        const searchTermInput = document.getElementById('search-term');
+        
+        // 切换查询面板
+        tabPredefined.addEventListener('click', () => {
+          tabPredefined.classList.add('active');
+          tabCustom.classList.remove('active');
+          predefinedQueries.style.display = 'block';
+          customQuery.style.display = 'none';
+        });
+        
+        tabCustom.addEventListener('click', () => {
+          tabPredefined.classList.remove('active');
+          tabCustom.classList.add('active');
+          predefinedQueries.style.display = 'none';
+          customQuery.style.display = 'block';
+        });
+        
+        // 预定义查询按钮
+        queryRecentBtn.addEventListener('click', () => {
+          fetchDbData('/api/db/recent');
+        });
+        
+        queryCountBtn.addEventListener('click', () => {
+          fetchDbData('/api/db/count');
+        });
+        
+        querySearchBtn.addEventListener('click', () => {
+          const term = searchTermInput.value.trim();
+          if (term) {
+            fetchDbData(\`/api/db/search?term=\${encodeURIComponent(term)}\`);
+          } else {
+            showNotification('请输入搜索关键词');
+          }
+        });
+        
+        // 执行自定义SQL查询
+        runSqlBtn.addEventListener('click', async () => {
+          const sql = sqlInput.value.trim();
+          if (!sql) {
+            showNotification('请输入SQL查询语句');
+            return;
+          }
+          
+          try {
+            const response = await fetch('/api/db/query', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ sql })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+              showNotification(\`查询错误: \${data.error}\`);
+            } else {
+              displayDbResults(data.results);
+            }
+          } catch (error) {
+            showNotification(\`请求错误: \${error.message}\`);
+          }
+        });
+        
+        // 获取数据库数据
+        async function fetchDbData(url) {
+          try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.error) {
+              showNotification(\`查询错误: \${data.error}\`);
+            } else {
+              displayDbResults(data.results);
+            }
+          } catch (error) {
+            showNotification(\`请求错误: \${error.message}\`);
+          }
+        }
+        
+        // 显示数据库查询结果
+        function displayDbResults(results) {
+          dbResultsBody.innerHTML = '';
+          
+          if (!Array.isArray(results)) {
+            // 处理非数组结果（如计数）
+            const row = document.createElement('tr');
+            row.innerHTML = \`
+              <td colspan="3" style="text-align: center;">\${JSON.stringify(results)}</td>
+            \`;
+            dbResultsBody.appendChild(row);
+            return;
+          }
+          
+          if (results.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = \`<td colspan="3" style="text-align: center;">没有找到记录</td>\`;
+            dbResultsBody.appendChild(row);
+            return;
+          }
+          
+          results.forEach(item => {
+            const row = document.createElement('tr');
+            
+            // 处理不同的结果格式
+            const id = item.id || '';
+            const callString = item.call_string || '';
+            let resultText = '';
+            
+            if (typeof item.result === 'string') {
+              try {
+                resultText = JSON.stringify(JSON.parse(item.result), null, 2);
+              } catch (e) {
+                resultText = item.result;
+              }
+            } else {
+              resultText = JSON.stringify(item.result, null, 2);
+            }
+            
+            row.innerHTML = \`
+              <td>\${id}</td>
+              <td>\${callString}</td>
+              <td><pre>\${resultText}</pre></td>
+            \`;
+            dbResultsBody.appendChild(row);
+          });
+        }
         
         // WebSocket连接
         let socket;
@@ -507,6 +746,9 @@ function createHtml() {
         fetchHistory();
         fetchModules();
         
+        // 加载初始数据库数据
+        fetchDbData('/api/db/recent');
+        
         // 初始化WebSocket
         initWebSocket();
         
@@ -535,6 +777,8 @@ function createHtml() {
               resultDiv.innerHTML = \`<p class="result-success">结果: \${JSON.stringify(data.success)}</p>\`;
               // 刷新历史记录
               fetchHistory();
+              // 刷新数据库查询结果
+              fetchDbData('/api/db/recent');
             }
           } catch (error) {
             resultDiv.innerHTML = \`<p class="result-error">请求错误: \${error.message}</p>\`;
@@ -545,6 +789,13 @@ function createHtml() {
         callInput.addEventListener('keyup', (event) => {
           if (event.key === 'Enter') {
             executeBtn.click();
+          }
+        });
+        
+        // 按Enter键执行SQL查询
+        sqlInput.addEventListener('keyup', (event) => {
+          if (event.key === 'Enter') {
+            runSqlBtn.click();
           }
         });
         
@@ -642,6 +893,132 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ error: error.message }));
     }
+  }
+  // 数据库API
+  else if (pathname === '/api/db/recent' && req.method === 'GET') {
+    try {
+      // 获取最近的记录
+      const stmt = db.prepare(`SELECT id, call_string, result FROM calls ORDER BY id DESC LIMIT 10`);
+      const results = [];
+      
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push(row);
+      }
+      
+      stmt.free();
+      
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ results }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: error.message }));
+    }
+  }
+  else if (pathname === '/api/db/count' && req.method === 'GET') {
+    try {
+      // 获取记录总数
+      const stmt = db.prepare('SELECT COUNT(*) as count FROM calls');
+      let count = 0;
+      
+      if (stmt.step()) {
+        count = stmt.getAsObject().count;
+      }
+      
+      stmt.free();
+      
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ results: { 总记录数: count } }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: error.message }));
+    }
+  }
+  else if (pathname === '/api/db/search' && req.method === 'GET') {
+    try {
+      const term = parsedUrl.query.term;
+      
+      if (!term) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: '缺少搜索关键词' }));
+        return;
+      }
+      
+      // 搜索记录
+      const searchPattern = `%${term}%`;
+      const stmt = db.prepare("SELECT id, call_string, result FROM calls WHERE call_string LIKE ? OR result LIKE ?");
+      stmt.bind([searchPattern, searchPattern]);
+      
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push(row);
+      }
+      
+      stmt.free();
+      
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ results }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: error.message }));
+    }
+  }
+  else if (pathname === '/api/db/query' && req.method === 'POST') {
+    // 处理自定义SQL查询
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    
+    req.on('end', async () => {
+      try {
+        const { sql } = JSON.parse(body);
+        
+        if (!sql) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: '缺少SQL语句' }));
+          return;
+        }
+        
+        // 安全检查：只允许SELECT语句以防止修改数据库
+        if (!sql.trim().toUpperCase().startsWith('SELECT')) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: '仅允许SELECT查询' }));
+          return;
+        }
+        
+        // 执行SQL查询
+        try {
+          const stmt = db.prepare(sql);
+          const results = [];
+          
+          while (stmt.step()) {
+            const row = stmt.getAsObject();
+            results.push(row);
+          }
+          
+          stmt.free();
+          
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ results }));
+        } catch (sqlError) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: `SQL错误: ${sqlError.message}` }));
+        }
+      } catch (error) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: error.message }));
+      }
+    });
   }
   else {
     // 404 未找到
