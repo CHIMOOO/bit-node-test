@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
+    "init-db": "node init-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -18,5 +19,11 @@
   "dependencies": {
     "sqlite3": "^5.1.6",
     "better-sqlite3": "^9.4.0"
+  },
+  "engines": {
+    "node": ">=14 <21"
+  },
+  "volta": {
+    "node": "20.19.1"
   }
-} 
+}

@@ -9,14 +9,13 @@
 - 显示可用模块和函数列表
 - 记录执行历史，保存到SQLite数据库中
 - 支持多种参数类型，如字符串、数字、布尔值等
-- 适配多种数据库驱动(sqlite3/better-sqlite3)，提高兼容性
 
 ## 安装和运行
 
 ### 前提条件
 
-- Node.js（建议使用v18或更高版本）
-- 系统中已安装SQLite3（或使用better-sqlite3作为备选）
+- Node.js（建议使用v14至v20版本）
+- 系统中已安装SQLite3（确保`sqlite3`命令可用）
 
 ### 安装步骤
 
@@ -27,13 +26,19 @@
 npm install
 ```
 
-3. 启动服务器：
+3. 初始化SQLite3数据库：
+
+```bash
+npm run init-db
+```
+
+4. 启动服务器：
 
 ```bash
 npm start
 ```
 
-4. 在浏览器中访问 http://localhost:8080
+5. 在浏览器中访问 http://localhost:8080
 
 ## 使用方法
 
@@ -60,24 +65,33 @@ npm start
 
 ```javascript
 exports.bark = (name) => {
-  return `Dog ${name} is barking: Woof! Woof!`;
+  return `狗狗 ${name} 正在汪汪叫：汪! 汪!`;
 };
 
 exports.run = (name, speed) => {
-  return `Dog ${name} is running at ${speed} km/h`;
+  return `狗狗 ${name} 正以 ${speed} 公里/小时的速度奔跑`;
 };
 ```
 
 完成后，刷新页面，您就可以调用`dog.bark("rex")`或`dog.run("rex", 20)`了。
 
-## 故障排除
+## SQLite3安装相关问题
 
-如果遇到sqlite3模块安装问题：
+如果在使用SQLite3模块时遇到问题：
 
-1. 确保系统中已安装SQLite3
-2. 检查Node.js版本是否与sqlite3模块兼容
-3. 如果仍有问题，程序会自动尝试使用better-sqlite3作为备选
-4. 最后会自动降级为内存存储，但数据将不会持久化
+1. 确保您使用的Node.js版本兼容sqlite3模块（建议Node.js v14-v20）
+2. 对于Windows用户，请确保系统已安装Visual C++构建工具
+3. 如果运行时出现sqlite3模块错误，可尝试重建模块：
+
+```bash
+npm rebuild sqlite3 --build-from-source
+```
+
+4. 如果仍然有问题，您可能需要全局安装node-gyp：
+
+```bash
+npm install -g node-gyp
+```
 
 ## 安全注意事项
 

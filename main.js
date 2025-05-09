@@ -2,67 +2,32 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const sqlite3 = require('sqlite3').verbose();
 
-// 数据库实例
-let db = null;
-let isBetterSqlite = false;
-
-// 尝试加载 sqlite3
-try {
-  const sqlite3 = require('sqlite3').verbose();
-  console.log('使用 sqlite3 模块');
-  
-  // 创建数据库连接
-  db = new sqlite3.Database('./calls.db');
-  
-  // 初始化数据库表
-  db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS calls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      call_string TEXT,
-      result TEXT
-    )`);
-  });
-} catch (sqliteError) {
-  console.error('sqlite3 加载失败，尝试使用 better-sqlite3');
-  console.error(sqliteError);
-  
-  try {
-    const betterSqlite3 = require('better-sqlite3');
-    console.log('使用 better-sqlite3 模块');
-    
-    db = betterSqlite3('./calls.db');
-    
-    // 初始化数据库表
-    db.exec(`CREATE TABLE IF NOT EXISTS calls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      call_string TEXT,
-      result TEXT
-    )`);
-    
-    isBetterSqlite = true;
-  } catch (betterSqliteError) {
-    console.error('better-sqlite3 也加载失败，将使用内存存储');
-    console.error(betterSqliteError);
-    
-    // 使用内存存储作为备用
-    db = {
-      inMemoryRecords: [],
-      run: function(sql, params, callback) {
-        if (sql.includes('INSERT INTO')) {
-          this.inMemoryRecords.push({
-            id: this.inMemoryRecords.length + 1,
-            call_string: params[0],
-            result: params[1]
-          });
-          if (callback) callback(null);
-        }
-      },
-      all: function(sql, callback) {
-        callback(null, this.inMemoryRecords.slice(-10).reverse());
-      }
-    };
+// 创建数据库连接
+console.log('正在连接到SQLite3数据库...');
+const db = new sqlite3.Database('./calls.db', (err) => {
+  if (err) {
+    console.error('无法连接到SQLite3数据库:', err.message);
+    console.error('请先运行 "node init-db.js" 初始化数据库');
+    process.exit(1);
   }
+  console.log('成功连接到SQLite3数据库');
+});
+
+// 初始化数据库表
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    call_string TEXT,
+    result TEXT
+  )`);
+});
+
+// 清除require缓存，确保每次都重新加载最新的模块
+function clearModuleCache(modulePath) {
+  const resolvedPath = require.resolve(modulePath);
+  delete require.cache[resolvedPath];
 }
 
 // 保存记录到数据库的函数
@@ -70,59 +35,31 @@ async function saveToDatabase(callString, result) {
   return new Promise((resolve, reject) => {
     const resultStr = JSON.stringify(result);
     
-    if (isBetterSqlite) {
-      try {
-        const stmt = db.prepare('INSERT INTO calls (call_string, result) VALUES (?, ?)');
-        stmt.run(callString, resultStr);
-        resolve();
-      } catch (err) {
-        console.error('保存到数据库失败:', err);
-        reject(err);
-      }
-    } else {
-      db.run('INSERT INTO calls (call_string, result) VALUES (?, ?)', 
-        [callString, resultStr], 
-        function(err) {
-          if (err) {
-            console.error('保存到数据库失败:', err);
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-    }
+    db.run('INSERT INTO calls (call_string, result) VALUES (?, ?)', 
+      [callString, resultStr], 
+      function(err) {
+        if (err) {
+          console.error('保存到数据库失败:', err);
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
   });
 }
 
 // 从数据库获取记录的函数
 async function getRecordsFromDatabase() {
   return new Promise((resolve, reject) => {
-    if (isBetterSqlite) {
-      try {
-        const stmt = db.prepare('SELECT call_string, result FROM calls ORDER BY id DESC LIMIT 10');
-        const rows = stmt.all();
-        resolve(rows);
-      } catch (err) {
+    db.all('SELECT call_string, result FROM calls ORDER BY id DESC LIMIT 10', (err, rows) => {
+      if (err) {
         console.error('从数据库获取记录失败:', err);
         reject(err);
+      } else {
+        resolve(rows);
       }
-    } else {
-      db.all('SELECT call_string, result FROM calls ORDER BY id DESC LIMIT 10', (err, rows) => {
-        if (err) {
-          console.error('从数据库获取记录失败:', err);
-          reject(err);
-        } else {
-          resolve(rows);
-        }
-      });
-    }
+    });
   });
-}
-
-// 清除require缓存，确保每次都重新加载最新的模块
-function clearModuleCache(modulePath) {
-  const resolvedPath = require.resolve(modulePath);
-  delete require.cache[resolvedPath];
 }
 
 // 动态加载并执行模块函数
@@ -194,6 +131,45 @@ async function executeModuleFunction(callString) {
   }
 }
 
+// 获取可用模块列表
+async function getAvailableModules() {
+  try {
+    const scriptsDir = path.join(__dirname, 'scripts');
+    const files = fs.readdirSync(scriptsDir);
+    
+    const modules = [];
+    
+    for (const file of files) {
+      if (file.endsWith('.js')) {
+        const moduleName = file.replace('.js', '');
+        const modulePath = path.join(scriptsDir, file);
+        
+        // 清除缓存并加载模块
+        clearModuleCache(modulePath);
+        const module = require(modulePath);
+        
+        // 获取模块中的所有函数
+        const functions = [];
+        for (const key in module) {
+          if (typeof module[key] === 'function') {
+            functions.push(key);
+          }
+        }
+        
+        modules.push({
+          name: moduleName,
+          functions: functions
+        });
+      }
+    }
+    
+    return modules;
+  } catch (error) {
+    console.error('获取可用模块失败:', error);
+    return [];
+  }
+}
+
 // 创建前端页面HTML
 function createHtml() {
   return `
@@ -242,12 +218,13 @@ function createHtml() {
       button:hover {
         background-color: #45a049;
       }
-      #result-container {
+      .modules-container {
         background-color: white;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         min-height: 100px;
+        margin-bottom: 20px;
       }
       .result-success {
         color: #4CAF50;
@@ -261,13 +238,6 @@ function createHtml() {
         background-color: #f9f9f9;
         border-radius: 4px;
       }
-      .modules-container {
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
-      }
       .module-item {
         margin-bottom: 5px;
       }
@@ -280,11 +250,11 @@ function createHtml() {
       <input type="text" id="call-input" placeholder="module.function(params)">
       <button id="execute-btn">执行</button>
     </div>
-    <div id="result-container">
+    <div id="result-container" class="modules-container">
       <h3>执行结果:</h3>
       <div id="result"></div>
     </div>
-    <div id="modules-container" class="modules-container">
+    <div id="modules-container" class="modules-container" style="margin-top: 20px;">
       <h3>可用模块:</h3>
       <div id="modules-list"></div>
     </div>
@@ -387,45 +357,6 @@ function createHtml() {
   </body>
   </html>
   `;
-}
-
-// 获取可用模块列表
-async function getAvailableModules() {
-  try {
-    const scriptsDir = path.join(__dirname, 'scripts');
-    const files = fs.readdirSync(scriptsDir);
-    
-    const modules = [];
-    
-    for (const file of files) {
-      if (file.endsWith('.js')) {
-        const moduleName = file.replace('.js', '');
-        const modulePath = path.join(scriptsDir, file);
-        
-        // 清除缓存并加载模块
-        clearModuleCache(modulePath);
-        const module = require(modulePath);
-        
-        // 获取模块中的所有函数
-        const functions = [];
-        for (const key in module) {
-          if (typeof module[key] === 'function') {
-            functions.push(key);
-          }
-        }
-        
-        modules.push({
-          name: moduleName,
-          functions: functions
-        });
-      }
-    }
-    
-    return modules;
-  } catch (error) {
-    console.error('获取可用模块失败:', error);
-    return [];
-  }
 }
 
 // 创建HTTP服务器
