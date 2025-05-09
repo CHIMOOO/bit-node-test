@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const initSqlJs = require('sql.js');
+const WebSocket = require('ws');
+
+// WebSocket 客户端连接列表
+let wsClients = [];
 
 // 创建数据库连接
 console.log('正在初始化SQL.js数据库...');
@@ -11,6 +15,42 @@ let SQL;
 
 // 数据库文件路径
 const dbPath = './calls.db';
+
+// 监控scripts目录变化
+function watchScriptsDirectory() {
+  const scriptsDir = path.join(__dirname, 'scripts');
+  
+  console.log(`开始监控scripts目录: ${scriptsDir}`);
+  
+  // 确保目录存在
+  if (!fs.existsSync(scriptsDir)) {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+  }
+  
+  // 监控文件变化
+  fs.watch(scriptsDir, { recursive: true }, async (eventType, filename) => {
+    if (!filename) return;
+    
+    console.log(`检测到scripts目录变化: ${filename}, 事件类型: ${eventType}`);
+    
+    try {
+      // 获取最新的模块列表
+      const modules = await getAvailableModules();
+      
+      // 通知所有连接的WebSocket客户端
+      wsClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'modules_updated',
+            modules: modules
+          }));
+        }
+      });
+    } catch (err) {
+      console.error('处理脚本变化时出错:', err);
+    }
+  });
+}
 
 // 异步初始化数据库
 async function initDatabase() {
@@ -333,6 +373,34 @@ function createHtml() {
       .module-item {
         margin-bottom: 5px;
       }
+      .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-left: 10px;
+      }
+      .status-connected {
+        background-color: #4CAF50;
+      }
+      .status-disconnected {
+        background-color: #f44336;
+      }
+      .notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .notification.show {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -341,6 +409,7 @@ function createHtml() {
       <p>请输入要执行的模块函数，例如: cat.walk("tomy")</p>
       <input type="text" id="call-input" placeholder="module.function(params)">
       <button id="execute-btn">执行</button>
+      <span id="ws-status" title="WebSocket连接状态"></span>
     </div>
     <div id="result-container" class="modules-container">
       <h3>执行结果:</h3>
@@ -354,6 +423,7 @@ function createHtml() {
       <h3>历史记录:</h3>
       <div id="history"></div>
     </div>
+    <div id="notification" class="notification"></div>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
@@ -362,10 +432,83 @@ function createHtml() {
         const resultDiv = document.getElementById('result');
         const historyDiv = document.getElementById('history');
         const modulesListDiv = document.getElementById('modules-list');
+        const wsStatusIndicator = document.getElementById('ws-status');
+        const notificationDiv = document.getElementById('notification');
+        
+        // WebSocket连接
+        let socket;
+        
+        // 初始化WebSocket连接
+        function initWebSocket() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = \`\${protocol}//\${window.location.host}/ws\`;
+          
+          socket = new WebSocket(wsUrl);
+          
+          socket.onopen = function() {
+            wsStatusIndicator.className = 'status-indicator status-connected';
+            wsStatusIndicator.title = '已连接到服务器';
+            console.log('WebSocket连接已建立');
+          };
+          
+          socket.onclose = function() {
+            wsStatusIndicator.className = 'status-indicator status-disconnected';
+            wsStatusIndicator.title = '未连接到服务器';
+            console.log('WebSocket连接已关闭，尝试重新连接...');
+            
+            // 5秒后尝试重新连接
+            setTimeout(initWebSocket, 5000);
+          };
+          
+          socket.onerror = function(error) {
+            console.error('WebSocket错误:', error);
+          };
+          
+          socket.onmessage = function(event) {
+            try {
+              const data = JSON.parse(event.data);
+              
+              if (data.type === 'modules_updated') {
+                // 更新模块列表
+                updateModulesList(data.modules);
+                showNotification('脚本已更新，模块列表已刷新');
+              }
+            } catch (err) {
+              console.error('处理WebSocket消息出错:', err);
+            }
+          };
+        }
+        
+        // 显示通知
+        function showNotification(message) {
+          notificationDiv.textContent = message;
+          notificationDiv.classList.add('show');
+          
+          setTimeout(() => {
+            notificationDiv.classList.remove('show');
+          }, 3000);
+        }
+        
+        // 更新模块列表
+        function updateModulesList(modules) {
+          modulesListDiv.innerHTML = '';
+          modules.forEach(module => {
+            const moduleItem = document.createElement('div');
+            moduleItem.className = 'module-item';
+            
+            const functions = module.functions.join(', ');
+            moduleItem.innerHTML = \`<strong>\${module.name}</strong>: \${functions}\`;
+            
+            modulesListDiv.appendChild(moduleItem);
+          });
+        }
         
         // 加载历史记录和可用模块
         fetchHistory();
         fetchModules();
+        
+        // 初始化WebSocket
+        initWebSocket();
         
         executeBtn.addEventListener('click', async () => {
           const callString = callInput.value.trim();
@@ -430,16 +573,7 @@ function createHtml() {
             const response = await fetch('/modules');
             const data = await response.json();
             
-            modulesListDiv.innerHTML = '';
-            data.modules.forEach(module => {
-              const moduleItem = document.createElement('div');
-              moduleItem.className = 'module-item';
-              
-              const functions = module.functions.join(', ');
-              moduleItem.innerHTML = \`<strong>\${module.name}</strong>: \${functions}\`;
-              
-              modulesListDiv.appendChild(moduleItem);
-            });
+            updateModulesList(data.modules);
           } catch (error) {
             modulesListDiv.innerHTML = \`<p class="result-error">获取模块列表失败: \${error.message}</p>\`;
           }
@@ -521,9 +655,37 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   await initDatabase();
   
-  // 启动服务器
+  // 创建HTTP服务器
   const PORT = 8080;
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`端口 ${PORT} 已被占用，请尝试使用其他端口`);
+      process.exit(1);
+    } else {
+      console.error('服务器错误:', err);
+    }
+  });
+  
   server.listen(PORT, () => {
     console.log(`服务器已启动，访问 http://localhost:${PORT}`);
+    
+    // 创建WebSocket服务器
+    const wss = new WebSocket.Server({ server });
+    
+    wss.on('connection', (ws) => {
+      console.log('新的WebSocket连接已建立');
+      
+      // 添加到客户端列表
+      wsClients.push(ws);
+      
+      // 当连接关闭时从列表中移除
+      ws.on('close', () => {
+        console.log('WebSocket连接已关闭');
+        wsClients = wsClients.filter(client => client !== ws);
+      });
+    });
+    
+    // 开始监控scripts目录
+    watchScriptsDirectory();
   });
 })();
