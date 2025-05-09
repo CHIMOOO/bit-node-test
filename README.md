@@ -1,100 +1,74 @@
 # 动态脚本执行器
 
-这是一个基于Node.js的动态脚本执行器，可以在不重启服务器的情况下，动态加载和执行scripts目录中的模块函数。
+这是一个基于Node.js的动态脚本执行器，允许用户通过Web界面调用预定义的脚本函数。本项目使用SQL.js作为数据库，可以记录函数调用历史和结果。
 
 ## 功能特点
 
-- 在Web界面中执行scripts目录中的模块函数
-- 动态加载模块，无需重启服务器即可加载新增或修改的模块和函数
-- 显示可用模块和函数列表
-- 记录执行历史，保存到SQLite数据库中
-- 支持多种参数类型，如字符串、数字、布尔值等
+- 🌐 Web界面调用脚本函数
+- 📝 记录函数调用历史
+- 🔄 动态加载脚本模块
+- 📊 显示可用模块和函数
+- 💾 使用SQL.js进行数据存储（基于SQLite但无需原生绑定）
 
-## 安装和运行
-
-### 前提条件
-
-- Node.js（建议使用v14至v20版本）
-- 系统中已安装SQLite3（确保`sqlite3`命令可用）
-
-### 安装步骤
-
-1. 克隆或下载项目代码
-2. 安装依赖包：
+## 安装
 
 ```bash
+# 克隆项目
+git clone <项目地址>
+cd <项目目录>
+
+# 安装依赖
 npm install
 ```
 
-3. 初始化SQLite3数据库：
+## 初始化数据库
 
 ```bash
 npm run init-db
 ```
 
-4. 启动服务器：
+## 启动服务器
 
 ```bash
 npm start
 ```
 
-5. 在浏览器中访问 http://localhost:8080
+启动后，访问 http://localhost:8080 即可使用Web界面。
 
-## 使用方法
+## 添加自定义脚本
 
-1. 在输入框中输入要执行的函数调用，格式为：`模块名.函数名(参数1, 参数2, ...)`
-   - 例如：`cat.walk("tomy")`
-   - 例如：`cat.sayHi("hello", "tony")`
-
-2. 点击"执行"按钮或按Enter键执行
-3. 执行结果会显示在下方的结果区域
-4. 历史记录会显示在页面底部
-
-## 添加新模块或函数
-
-您可以在不重启服务器的情况下：
-
-1. 在`scripts`目录中添加新的`.js`文件（模块）
-2. 在现有模块中添加或修改函数
-
-所有新增的模块和函数都可以立即在前端页面中调用，无需重启服务器。
-
-## 模块编写示例
-
-在`scripts`目录中创建一个新文件，例如`dog.js`：
+1. 在`scripts`目录下创建JavaScript文件
+2. 导出函数，例如：
 
 ```javascript
-exports.bark = (name) => {
-  return `狗狗 ${name} 正在汪汪叫：汪! 汪!`;
-};
-
-exports.run = (name, speed) => {
-  return `狗狗 ${name} 正以 ${speed} 公里/小时的速度奔跑`;
+// scripts/myModule.js
+exports.myFunction = function(param1, param2) {
+  return `执行结果: ${param1}, ${param2}`;
 };
 ```
 
-完成后，刷新页面，您就可以调用`dog.bark("rex")`或`dog.run("rex", 20)`了。
+3. 在Web界面中，以`myModule.myFunction("value1", "value2")`的形式调用
 
-## SQLite3安装相关问题
+## 技术实现
 
-如果在使用SQLite3模块时遇到问题：
+- 前端：纯JavaScript + HTML
+- 后端：Node.js
+- 数据库：SQL.js (SQLite的WebAssembly实现)
+- HTTP服务器：Node.js内置http模块
 
-1. 确保您使用的Node.js版本兼容sqlite3模块（建议Node.js v14-v20）
-2. 对于Windows用户，请确保系统已安装Visual C++构建工具
-3. 如果运行时出现sqlite3模块错误，可尝试重建模块：
+## 文件结构
 
-```bash
-npm rebuild sqlite3 --build-from-source
+```
+├── main.js           # 主服务器文件
+├── init-db.js        # 数据库初始化脚本
+├── scripts/          # 脚本目录
+│   ├── cat.js        # 示例脚本
+│   └── dog.js        # 示例脚本
+├── calls.db          # SQLite数据库文件
+└── package.json      # 项目配置文件
 ```
 
-4. 如果仍然有问题，您可能需要全局安装node-gyp：
+## 注意事项
 
-```bash
-npm install -g node-gyp
-```
-
-## 安全注意事项
-
-- 本程序避免了使用eval()，提高了安全性
-- 在生产环境中使用时，应添加适当的授权和身份验证机制
-- 建议不要在scripts目录中放置敏感操作代码
+- 本项目使用SQL.js替代sqlite3，无需编译原生模块
+- 为了安全起见，此服务器应仅在受信任的环境中使用

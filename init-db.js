@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
 
-console.log('正在创建 SQLite3 数据库...');
+console.log('正在创建 SQL.js 数据库...');
 
 // 数据库文件路径
 const dbPath = path.join(__dirname, 'calls.db');
@@ -14,35 +14,36 @@ if (fs.existsSync(dbPath)) {
   process.exit(0);
 }
 
-// 创建数据库连接
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
+// 异步初始化数据库
+async function initDatabase() {
+  try {
+    // 初始化 SQL.js
+    const SQL = await initSqlJs();
+    
+    // 创建新数据库
+    const db = new SQL.Database();
+    console.log(`成功创建数据库`);
+    
+    // 创建表
+    db.run(`CREATE TABLE IF NOT EXISTS calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      call_string TEXT,
+      result TEXT
+    )`);
+    console.log('成功创建表: calls');
+    
+    // 导出数据库为二进制数据并保存到文件
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+    console.log(`数据库文件已保存到: ${dbPath}`);
+    
+    console.log('数据库初始化完成！');
+  } catch (err) {
     console.error('创建数据库失败:', err.message);
     process.exit(1);
   }
-  console.log(`成功创建数据库文件: ${dbPath}`);
-});
+}
 
-// 创建表
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS calls (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    call_string TEXT,
-    result TEXT
-  )`, (err) => {
-    if (err) {
-      console.error('创建表失败:', err.message);
-    } else {
-      console.log('成功创建表: calls');
-    }
-  });
-});
-
-// 关闭数据库连接
-db.close((err) => {
-  if (err) {
-    console.error('关闭数据库连接失败:', err.message);
-    process.exit(1);
-  }
-  console.log('数据库初始化完成！');
-}); 
+// 执行初始化
+initDatabase(); 

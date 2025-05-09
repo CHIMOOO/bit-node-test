@@ -2,27 +2,49 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
 
 // 创建数据库连接
-console.log('正在连接到SQLite3数据库...');
-const db = new sqlite3.Database('./calls.db', (err) => {
-  if (err) {
-    console.error('无法连接到SQLite3数据库:', err.message);
-    console.error('请先运行 "node init-db.js" 初始化数据库');
+console.log('正在初始化SQL.js数据库...');
+let db;
+let SQL;
+
+// 数据库文件路径
+const dbPath = './calls.db';
+
+// 异步初始化数据库
+async function initDatabase() {
+  try {
+    SQL = await initSqlJs();
+    
+    // 检查数据库文件是否存在
+    if (fs.existsSync(dbPath)) {
+      const filebuffer = fs.readFileSync(dbPath);
+      db = new SQL.Database(filebuffer);
+      console.log('成功加载已有的SQL.js数据库');
+    } else {
+      // 创建新数据库
+      db = new SQL.Database();
+      console.log('创建新的SQL.js数据库');
+      
+      // 创建表
+      db.run(`CREATE TABLE IF NOT EXISTS calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        call_string TEXT,
+        result TEXT
+      )`);
+      
+      // 保存数据库文件
+      const data = db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(dbPath, buffer);
+    }
+  } catch (err) {
+    console.error('初始化SQL.js数据库失败:', err.message);
+    console.error('请确保已安装sql.js包');
     process.exit(1);
   }
-  console.log('成功连接到SQLite3数据库');
-});
-
-// 初始化数据库表
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS calls (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    call_string TEXT,
-    result TEXT
-  )`);
-});
+}
 
 // 清除require缓存，确保每次都重新加载最新的模块
 function clearModuleCache(modulePath) {
@@ -30,35 +52,54 @@ function clearModuleCache(modulePath) {
   delete require.cache[resolvedPath];
 }
 
+// 保存数据库文件的函数
+function saveDatabase() {
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  } catch (err) {
+    console.error('保存数据库文件失败:', err);
+  }
+}
+
 // 保存记录到数据库的函数
 async function saveToDatabase(callString, result) {
   return new Promise((resolve, reject) => {
-    const resultStr = JSON.stringify(result);
-    
-    db.run('INSERT INTO calls (call_string, result) VALUES (?, ?)', 
-      [callString, resultStr], 
-      function(err) {
-        if (err) {
-          console.error('保存到数据库失败:', err);
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
+    try {
+      const resultStr = JSON.stringify(result);
+      
+      db.run('INSERT INTO calls (call_string, result) VALUES (?, ?)', 
+        [callString, resultStr]);
+      
+      // 保存到文件
+      saveDatabase();
+      resolve();
+    } catch (err) {
+      console.error('保存到数据库失败:', err);
+      reject(err);
+    }
   });
 }
 
 // 从数据库获取记录的函数
 async function getRecordsFromDatabase() {
   return new Promise((resolve, reject) => {
-    db.all('SELECT call_string, result FROM calls ORDER BY id DESC LIMIT 10', (err, rows) => {
-      if (err) {
-        console.error('从数据库获取记录失败:', err);
-        reject(err);
-      } else {
-        resolve(rows);
+    try {
+      const stmt = db.prepare('SELECT call_string, result FROM calls ORDER BY id DESC LIMIT 10');
+      const rows = [];
+      
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        rows.push(row);
       }
-    });
+      
+      stmt.free();
+      resolve(rows);
+    } catch (err) {
+      console.error('从数据库获取记录失败:', err);
+      reject(err);
+    }
   });
 }
 
@@ -425,8 +466,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// 启动服务器
-const PORT = 8080;
-server.listen(PORT, () => {
-  console.log(`服务器已启动，访问 http://localhost:${PORT}`);
-});
+// 初始化数据库并启动服务器
+(async () => {
+  await initDatabase();
+  
+  // 启动服务器
+  const PORT = 8080;
+  server.listen(PORT, () => {
+    console.log(`服务器已启动，访问 http://localhost:${PORT}`);
+  });
+})();

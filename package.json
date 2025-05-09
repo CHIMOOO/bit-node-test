@@ -17,8 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "sqlite3": "^5.1.6",
-    "better-sqlite3": "^9.4.0"
+    "sql.js": "^1.8.0"
   },
   "engines": {
     "node": ">=14 <21"
