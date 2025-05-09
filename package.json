@@ -1,0 +1,21 @@
+{
+  "name": "dynamic-script-executor",
+  "version": "1.0.0",
+  "description": "动态加载和执行脚本的HTTP服务器",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node",
+    "dynamic",
+    "scripts",
+    "executor"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sqlite3": "^5.1.6"
+  }
+} 
