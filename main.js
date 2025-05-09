@@ -311,228 +311,639 @@ function createHtml() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>动态脚本执行器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-      body {
-        font-family: 'Arial', sans-serif;
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #f5f5f5;
+      :root {
+        --primary-color: #3b82f6;
+        --primary-hover: #2563eb;
+        --secondary-color: #10b981;
+        --light-bg: #f5f7fb;
+        --light-panel: #ffffff;
+        --light-header: #ffffff;
+        --light-border: #e5e7eb;
+        --text-dark: #1f2937;
+        --text-gray: #6b7280;
+        --danger-color: #ef4444;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --sidebar-width: 280px;
       }
-      h1 {
-        color: #333;
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--light-bg);
+        color: var(--text-dark);
+        line-height: 1.5;
+        overflow-x: hidden;
+      }
+      
+      .app-container {
+        display: flex;
+        min-height: 100vh;
+      }
+      
+      /* 侧边栏样式 */
+      .sidebar {
+        width: var(--sidebar-width);
+        background-color: var(--light-panel);
+        border-right: 1px solid var(--light-border);
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        overflow-y: auto;
+        transition: transform 0.3s ease;
+        z-index: 100;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        padding: 20px;
+        background-color: var(--light-header);
+        height: 70px;
+        border-bottom: 1px solid var(--light-border);
+      }
+      
+      .logo {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+      }
+      
+      .logo i {
+        color: var(--primary-color);
+        margin-right: 10px;
+      }
+      
+      .sidebar-content {
+        padding: 20px 0;
+      }
+      
+      .sidebar-nav {
+        list-style: none;
+      }
+      
+      .sidebar-nav-item {
+        margin-bottom: 4px;
+      }
+      
+      .sidebar-nav-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: var(--text-gray);
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+      }
+      
+      .sidebar-nav-link:hover {
+        color: var(--text-dark);
+        background-color: rgba(0, 0, 0, 0.03);
+      }
+      
+      .sidebar-nav-link.active {
+        color: var(--primary-color);
+        background-color: rgba(59, 130, 246, 0.1);
+        border-left: 3px solid var(--primary-color);
+      }
+      
+      .sidebar-nav-link i {
+        margin-right: 10px;
+        width: 20px;
         text-align: center;
       }
-      .form-container {
-        background-color: white;
+      
+      /* 主内容区域 */
+      .main-content {
+        flex: 1;
+        margin-left: var(--sidebar-width);
         padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
       }
-      input[type="text"] {
-        width: 100%;
-        padding: 10px;
-        margin-bottom: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 16px;
+      
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 70px;
+        padding: 0 20px;
+        background-color: var(--light-header);
+        border-bottom: 1px solid var(--light-border);
+        margin: -20px -20px 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
-      button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 16px;
+      
+      .header h1 {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-dark);
       }
-      button:hover {
-        background-color: #45a049;
+      
+      .connection-status {
+        display: flex;
+        align-items: center;
       }
-      .modules-container {
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        min-height: 100px;
-        margin-bottom: 20px;
-      }
-      .result-success {
-        color: #4CAF50;
-      }
-      .result-error {
-        color: #f44336;
-      }
-      .history-item {
-        margin-bottom: 8px;
-        padding: 8px;
-        background-color: #f9f9f9;
-        border-radius: 4px;
-      }
-      .module-item {
-        margin-bottom: 5px;
-      }
-      .status-indicator {
+      
+      .connection-status .status-indicator {
         display: inline-block;
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        margin-left: 10px;
+        margin-right: 6px;
       }
+      
       .status-connected {
-        background-color: #4CAF50;
+        background-color: var(--success-color);
       }
+      
       .status-disconnected {
-        background-color: #f44336;
+        background-color: var(--danger-color);
       }
+      
+      /* 卡片样式 */
+      .card {
+        background-color: var(--light-panel);
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        margin-bottom: 24px;
+        overflow: hidden;
+        border: 1px solid var(--light-border);
+      }
+      
+      .card-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--light-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--light-header);
+      }
+      
+      .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-dark);
+      }
+      
+      .card-body {
+        padding: 24px;
+      }
+      
+      /* 表单元素 */
+      .form-group {
+        margin-bottom: 20px;
+      }
+      
+      .form-help {
+        color: var(--text-gray);
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      
+      .input-group {
+        display: flex;
+      }
+      
+      .input-group input {
+        flex: 1;
+        margin-right: 10px;
+      }
+      
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--light-border);
+        border-radius: 4px;
+        background-color: white;
+        color: var(--text-dark);
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+      
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+      }
+      
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: var(--text-dark);
+      }
+      
+      /* 按钮样式 */
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+      }
+      
+      .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+      }
+      
+      .btn-primary:hover {
+        background-color: var(--primary-hover);
+      }
+      
+      .btn-sm {
+        padding: 8px 16px;
+        font-size: 12px;
+      }
+      
+      /* 标签页 */
+      .tabs {
+        display: flex;
+        list-style: none;
+        border-bottom: 1px solid var(--light-border);
+        margin-bottom: 20px;
+      }
+      
+      .tab-item {
+        margin-right: 4px;
+        margin-bottom: -1px;
+      }
+      
+      .tab-link {
+        display: inline-block;
+        padding: 12px 20px;
+        color: var(--text-gray);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+      }
+      
+      .tab-link:hover {
+        color: var(--text-dark);
+      }
+      
+      .tab-link.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+      }
+      
+      /* 表格样式 */
+      .table-container {
+        overflow-x: auto;
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      th, td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--light-border);
+      }
+      
+      th {
+        color: var(--text-gray);
+        font-weight: 500;
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+      
+      tr:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+      
+      /* 模块列表 */
+      .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+      }
+      
+      .module-item {
+        background-color: var(--light-panel);
+        border-radius: 4px;
+        padding: 16px;
+        border: 1px solid var(--light-border);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .module-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+      
+      .module-name {
+        color: var(--text-dark);
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      
+      .module-functions {
+        color: var(--text-gray);
+        font-size: 13px;
+      }
+      
+      /* 执行结果和历史记录 */
+      .result-success {
+        color: var(--text-dark);
+        background-color: rgba(16, 185, 129, 0.1);
+        padding: 16px;
+        border-radius: 4px;
+        border-left: 3px solid var(--success-color);
+      }
+      
+      .result-error {
+        color: var(--text-dark);
+        background-color: rgba(239, 68, 68, 0.1);
+        padding: 16px;
+        border-radius: 4px;
+        border-left: 3px solid var(--danger-color);
+      }
+      
+      .history-item {
+        padding: 16px;
+        border-radius: 4px;
+        background-color: var(--light-panel);
+        margin-bottom: 12px;
+        border: 1px solid var(--light-border);
+      }
+      
+      .history-command {
+        color: var(--primary-color);
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      
+      .history-result {
+        color: var(--text-gray);
+        font-size: 13px;
+      }
+      
+      /* 数据库表格 */
+      .db-results-container {
+        max-height: 400px;
+        overflow-y: auto;
+        border-radius: 4px;
+        border: 1px solid var(--light-border);
+      }
+      
+      .db-results td pre {
+        max-height: 100px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 12px;
+      }
+      
+      /* 通知 */
       .notification {
         position: fixed;
         bottom: 20px;
         right: 20px;
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 20px;
+        background-color: var(--light-panel);
+        color: var(--text-dark);
+        padding: 12px 20px;
         border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         opacity: 0;
-        transition: opacity 0.3s;
+        transform: translateY(10px);
+        transition: all 0.3s ease;
+        border-left: 3px solid var(--primary-color);
+        z-index: 1000;
       }
+      
       .notification.show {
         opacity: 1;
+        transform: translateY(0);
       }
-      .db-container {
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-top: 20px;
+      
+      /* 移动端响应式 */
+      @media screen and (max-width: 768px) {
+        .sidebar {
+          transform: translateX(-100%);
+        }
+        
+        .sidebar.active {
+          transform: translateX(0);
+        }
+        
+        .main-content {
+          margin-left: 0;
+        }
+        
+        .mobile-menu-toggle {
+          display: block;
+        }
       }
-      .db-query-container {
-        display: flex;
-        margin-bottom: 10px;
-      }
-      .db-query-container input {
-        flex-grow: 1;
-        margin-right: 10px;
-        margin-bottom: 0;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-      }
-      th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-      }
-      th {
-        background-color: #f2f2f2;
-      }
-      tr:nth-child(even) {
-        background-color: #f9f9f9;
-      }
-      tr:hover {
-        background-color: #f1f1f1;
-      }
-      .db-table-container {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-      }
-      .tab-container {
-        margin-bottom: 10px;
-      }
-      .tab-button {
-        background-color: #f1f1f1;
+      
+      /* 移动菜单 */
+      .mobile-menu-toggle {
+        display: none;
+        background: none;
         border: none;
-        outline: none;
+        color: var(--text-dark);
+        font-size: 24px;
         cursor: pointer;
-        padding: 10px 15px;
-        transition: 0.3s;
-        border-radius: 4px 4px 0 0;
-        margin-right: 2px;
-      }
-      .tab-button:hover {
-        background-color: #ddd;
-      }
-      .tab-button.active {
-        background-color: #4CAF50;
-        color: white;
       }
     </style>
   </head>
   <body>
-    <h1>动态脚本执行器</h1>
-    <div class="form-container">
-      <p>请输入要执行的模块函数，例如: cat.walk("tomy")</p>
-      <input type="text" id="call-input" placeholder="module.function(params)">
-      <button id="execute-btn">执行</button>
-      <span id="ws-status" title="WebSocket连接状态"></span>
-    </div>
-    <div id="result-container" class="modules-container">
-      <h3>执行结果:</h3>
-      <div id="result"></div>
-    </div>
-    <div id="modules-container" class="modules-container" style="margin-top: 20px;">
-      <h3>可用模块:</h3>
-      <div id="modules-list"></div>
-    </div>
-    <div id="history-container" style="margin-top: 20px;">
-      <h3>历史记录:</h3>
-      <div id="history"></div>
-    </div>
-    
-    <!-- 数据库查询模块 -->
-    <div id="db-container" class="db-container">
-      <h3>数据库查询:</h3>
-      <div class="tab-container">
-        <button id="tab-predefined" class="tab-button active">预定义查询</button>
-        <button id="tab-custom" class="tab-button">自定义SQL</button>
-      </div>
-      
-      <div id="predefined-queries" class="query-panel">
-        <button id="query-recent" class="query-btn">最近10条记录</button>
-        <button id="query-count" class="query-btn">记录总数</button>
-        <input type="text" id="search-term" placeholder="搜索关键词">
-        <button id="query-search" class="query-btn">搜索</button>
-      </div>
-      
-      <div id="custom-query" class="query-panel" style="display:none">
-        <div class="db-query-container">
-          <input type="text" id="sql-input" placeholder="输入SQL查询语句，例如: SELECT * FROM calls LIMIT 5">
-          <button id="run-sql-btn">执行查询</button>
+    <div class="app-container">
+      <!-- 侧边栏 -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <i class="fas fa-code"></i>
+            <span>脚本执行器</span>
+          </div>
         </div>
-      </div>
+        <div class="sidebar-content">
+          <ul class="sidebar-nav">
+            <li class="sidebar-nav-item">
+              <a href="#executor" class="sidebar-nav-link active" data-target="executor-section">
+                <i class="fas fa-play-circle"></i>
+                <span>执行脚本</span>
+              </a>
+            </li>
+            <li class="sidebar-nav-item">
+              <a href="#history" class="sidebar-nav-link" data-target="history-section">
+                <i class="fas fa-history"></i>
+                <span>执行历史</span>
+              </a>
+            </li>
+            <li class="sidebar-nav-item">
+              <a href="#database" class="sidebar-nav-link" data-target="database-section">
+                <i class="fas fa-database"></i>
+                <span>数据库查询</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </aside>
       
-      <div class="db-table-container">
-        <table id="db-results">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>调用字符串</th>
-              <th>结果</th>
-            </tr>
-          </thead>
-          <tbody id="db-results-body">
-            <!-- 查询结果将在这里显示 -->
-          </tbody>
-        </table>
-      </div>
+      <!-- 主内容区域 -->
+      <main class="main-content">
+        <header class="header">
+          <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+            <i class="fas fa-bars"></i>
+          </button>
+          <h1>动态脚本执行器</h1>
+          <div class="connection-status">
+            <span class="status-indicator" id="ws-status"></span>
+            <span id="connection-text">WebSocket状态</span>
+          </div>
+        </header>
+        
+        <!-- 执行脚本部分 -->
+        <section id="executor-section" class="content-section active">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">执行脚本</h2>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="call-input">输入要执行的模块函数</label>
+                <p class="form-help">例如: cat.walk("tomy") 或 db.getRecent(5)</p>
+                <div class="input-group">
+                  <input type="text" id="call-input" placeholder="module.function(params)">
+                  <button id="execute-btn" class="btn btn-primary">执行</button>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>执行结果</label>
+                <div id="result"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 可用模块部分（合并到执行脚本页面） -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">可用模块</h2>
+            </div>
+            <div class="card-body">
+              <div class="module-grid" id="modules-list">
+                <!-- 模块列表将在这里动态加载 -->
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 执行历史部分 -->
+        <section id="history-section" class="content-section" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">执行历史</h2>
+            </div>
+            <div class="card-body">
+              <div id="history">
+                <!-- 历史记录将在这里动态加载 -->
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 数据库查询部分 -->
+        <section id="database-section" class="content-section" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">数据库查询</h2>
+            </div>
+            <div class="card-body">
+              <ul class="tabs">
+                <li class="tab-item">
+                  <a href="#" class="tab-link active" id="tab-predefined">预定义查询</a>
+                </li>
+                <li class="tab-item">
+                  <a href="#" class="tab-link" id="tab-custom">自定义SQL</a>
+                </li>
+              </ul>
+              
+              <div id="predefined-queries" class="tab-content">
+                <div class="form-group">
+                  <div class="query-buttons">
+                    <button id="query-recent" class="btn btn-primary btn-sm">最近10条记录</button>
+                    <button id="query-count" class="btn btn-primary btn-sm">记录总数</button>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="search-term">关键词搜索</label>
+                  <div class="input-group">
+                    <input type="text" id="search-term" placeholder="输入搜索关键词">
+                    <button id="query-search" class="btn btn-primary">搜索</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div id="custom-query" class="tab-content" style="display:none;">
+                <div class="form-group">
+                  <label for="sql-input">SQL查询</label>
+                  <div class="input-group">
+                    <input type="text" id="sql-input" placeholder="输入SQL查询语句，例如: SELECT * FROM calls LIMIT 5">
+                    <button id="run-sql-btn" class="btn btn-primary">执行查询</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>查询结果</label>
+                <div class="db-results-container">
+                  <table class="db-results" id="db-results">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>调用字符串</th>
+                        <th>结果</th>
+                      </tr>
+                    </thead>
+                    <tbody id="db-results-body">
+                      <!-- 查询结果将在这里显示 -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
     
     <div id="notification" class="notification"></div>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
+        // 获取DOM元素
+        const sidebar = document.getElementById('sidebar');
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const navLinks = document.querySelectorAll('.sidebar-nav-link');
+        const contentSections = document.querySelectorAll('.content-section');
+        
         const callInput = document.getElementById('call-input');
         const executeBtn = document.getElementById('execute-btn');
         const resultDiv = document.getElementById('result');
         const historyDiv = document.getElementById('history');
         const modulesListDiv = document.getElementById('modules-list');
         const wsStatusIndicator = document.getElementById('ws-status');
+        const connectionText = document.getElementById('connection-text');
         const notificationDiv = document.getElementById('notification');
         
         // 数据库查询相关元素
@@ -548,15 +959,44 @@ function createHtml() {
         const querySearchBtn = document.getElementById('query-search');
         const searchTermInput = document.getElementById('search-term');
         
+        // 移动菜单切换
+        mobileMenuToggle.addEventListener('click', () => {
+          sidebar.classList.toggle('active');
+        });
+        
+        // 导航菜单切换
+        navLinks.forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            // 更新激活的导航链接
+            navLinks.forEach(item => item.classList.remove('active'));
+            link.classList.add('active');
+            
+            // 显示对应的内容区域
+            const targetId = link.getAttribute('data-target');
+            contentSections.forEach(section => {
+              section.style.display = section.id === targetId ? 'block' : 'none';
+            });
+            
+            // 移动端关闭侧边栏
+            if (window.innerWidth <= 768) {
+              sidebar.classList.remove('active');
+            }
+          });
+        });
+        
         // 切换查询面板
-        tabPredefined.addEventListener('click', () => {
+        tabPredefined.addEventListener('click', (e) => {
+          e.preventDefault();
           tabPredefined.classList.add('active');
           tabCustom.classList.remove('active');
           predefinedQueries.style.display = 'block';
           customQuery.style.display = 'none';
         });
         
-        tabCustom.addEventListener('click', () => {
+        tabCustom.addEventListener('click', (e) => {
+          e.preventDefault();
           tabPredefined.classList.remove('active');
           tabCustom.classList.add('active');
           predefinedQueries.style.display = 'none';
@@ -674,6 +1114,25 @@ function createHtml() {
           });
         }
         
+        // 模块点击处理，自动填充到输入框
+        function setupModuleItemListeners() {
+          const moduleItems = document.querySelectorAll('.module-item');
+          moduleItems.forEach(item => {
+            item.addEventListener('click', () => {
+              const moduleName = item.getAttribute('data-module');
+              const functionName = item.getAttribute('data-function');
+              
+              if (moduleName && functionName) {
+                callInput.value = \`\${moduleName}.\${functionName}()\`;
+                callInput.focus();
+                // 将光标放在括号内
+                const cursorPos = callInput.value.length - 1;
+                callInput.setSelectionRange(cursorPos, cursorPos);
+              }
+            });
+          });
+        }
+        
         // WebSocket连接
         let socket;
         
@@ -686,14 +1145,14 @@ function createHtml() {
           
           socket.onopen = function() {
             wsStatusIndicator.className = 'status-indicator status-connected';
-            wsStatusIndicator.title = '已连接到服务器';
-            console.log('WebSocket连接已建立');
+            connectionText.textContent = 'WebSocket已连接';
+            showNotification('WebSocket连接已建立');
           };
           
           socket.onclose = function() {
             wsStatusIndicator.className = 'status-indicator status-disconnected';
-            wsStatusIndicator.title = '未连接到服务器';
-            console.log('WebSocket连接已关闭，尝试重新连接...');
+            connectionText.textContent = 'WebSocket已断开';
+            showNotification('WebSocket连接已断开，尝试重新连接...');
             
             // 5秒后尝试重新连接
             setTimeout(initWebSocket, 5000);
@@ -731,31 +1190,79 @@ function createHtml() {
         // 更新模块列表
         function updateModulesList(modules) {
           modulesListDiv.innerHTML = '';
+          
+          if (!modules.length) {
+            modulesListDiv.innerHTML = '<p>没有可用的模块</p>';
+            return;
+          }
+          
           modules.forEach(module => {
-            const moduleItem = document.createElement('div');
-            moduleItem.className = 'module-item';
+            const moduleName = module.name;
             
-            const functions = module.functions.join(', ');
-            moduleItem.innerHTML = \`<strong>\${module.name}</strong>: \${functions}\`;
-            
-            modulesListDiv.appendChild(moduleItem);
+            // 为每个函数创建一个模块项
+            module.functions.forEach(functionName => {
+              const moduleItem = document.createElement('div');
+              moduleItem.className = 'module-item';
+              moduleItem.setAttribute('data-module', moduleName);
+              moduleItem.setAttribute('data-function', functionName);
+              
+              moduleItem.innerHTML = \`
+                <div class="module-name"><i class="fas fa-cube"></i> \${moduleName}.\${functionName}</div>
+                <div class="module-functions">点击快速使用此函数</div>
+              \`;
+              
+              modulesListDiv.appendChild(moduleItem);
+            });
           });
+          
+          // 设置模块项点击事件
+          setupModuleItemListeners();
         }
         
-        // 加载历史记录和可用模块
-        fetchHistory();
-        fetchModules();
+        // 加载历史记录
+        async function fetchHistory() {
+          try {
+            const response = await fetch('/history');
+            const data = await response.json();
+            
+            historyDiv.innerHTML = '';
+            
+            if (!data.length) {
+              historyDiv.innerHTML = '<p>没有执行历史记录</p>';
+              return;
+            }
+            
+            data.forEach(item => {
+              const historyItem = document.createElement('div');
+              historyItem.className = 'history-item';
+              historyItem.innerHTML = \`
+                <div class="history-command"><i class="fas fa-terminal"></i> \${item.call_string}</div>
+                <div class="history-result">\${item.result}</div>
+              \`;
+              historyDiv.appendChild(historyItem);
+            });
+          } catch (error) {
+            historyDiv.innerHTML = \`<p class="result-error">获取历史记录失败: \${error.message}</p>\`;
+          }
+        }
         
-        // 加载初始数据库数据
-        fetchDbData('/api/db/recent');
+        // 加载模块列表
+        async function fetchModules() {
+          try {
+            const response = await fetch('/modules');
+            const data = await response.json();
+            
+            updateModulesList(data.modules);
+          } catch (error) {
+            modulesListDiv.innerHTML = \`<p class="result-error">获取模块列表失败: \${error.message}</p>\`;
+          }
+        }
         
-        // 初始化WebSocket
-        initWebSocket();
-        
+        // 执行脚本
         executeBtn.addEventListener('click', async () => {
           const callString = callInput.value.trim();
           if (!callString) {
-            resultDiv.innerHTML = '<p class="result-error">请输入要执行的函数调用</p>';
+            resultDiv.innerHTML = '<div class="result-error">请输入要执行的函数调用</div>';
             return;
           }
           
@@ -772,16 +1279,16 @@ function createHtml() {
             const data = await response.json();
             
             if (data.error) {
-              resultDiv.innerHTML = \`<p class="result-error">错误: \${data.error}</p>\`;
+              resultDiv.innerHTML = \`<div class="result-error">\${data.error}</div>\`;
             } else {
-              resultDiv.innerHTML = \`<p class="result-success">结果: \${JSON.stringify(data.success)}</p>\`;
+              resultDiv.innerHTML = \`<div class="result-success">\${JSON.stringify(data.success)}</div>\`;
               // 刷新历史记录
               fetchHistory();
               // 刷新数据库查询结果
               fetchDbData('/api/db/recent');
             }
           } catch (error) {
-            resultDiv.innerHTML = \`<p class="result-error">请求错误: \${error.message}</p>\`;
+            resultDiv.innerHTML = \`<div class="result-error">请求错误: \${error.message}</div>\`;
           }
         });
         
@@ -799,36 +1306,15 @@ function createHtml() {
           }
         });
         
-        async function fetchHistory() {
-          try {
-            const response = await fetch('/history');
-            const data = await response.json();
-            
-            historyDiv.innerHTML = '';
-            data.forEach(item => {
-              const historyItem = document.createElement('div');
-              historyItem.className = 'history-item';
-              historyItem.innerHTML = \`
-                <strong>调用:</strong> \${item.call_string}<br>
-                <strong>结果:</strong> \${item.result}
-              \`;
-              historyDiv.appendChild(historyItem);
-            });
-          } catch (error) {
-            historyDiv.innerHTML = \`<p class="result-error">获取历史记录失败: \${error.message}</p>\`;
-          }
-        }
+        // 加载历史记录和可用模块
+        fetchHistory();
+        fetchModules();
         
-        async function fetchModules() {
-          try {
-            const response = await fetch('/modules');
-            const data = await response.json();
-            
-            updateModulesList(data.modules);
-          } catch (error) {
-            modulesListDiv.innerHTML = \`<p class="result-error">获取模块列表失败: \${error.message}</p>\`;
-          }
-        }
+        // 加载初始数据库数据
+        fetchDbData('/api/db/recent');
+        
+        // 初始化WebSocket
+        initWebSocket();
       });
     </script>
   </body>
