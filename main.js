@@ -114,8 +114,14 @@ async function executeModuleFunction(callString) {
 
     const [, moduleName, functionName, paramsString] = match;
     
-    // 构建模块路径
-    const modulePath = path.join(__dirname, 'scripts', `${moduleName}.js`);
+    let modulePath;
+    // 首先检查根目录
+    if (moduleName === 'db' && fs.existsSync(path.join(__dirname, 'db.js'))) {
+      modulePath = path.join(__dirname, 'db.js');
+    } else {
+      // 否则查找scripts目录
+      modulePath = path.join(__dirname, 'scripts', `${moduleName}.js`);
+    }
     
     // 检查模块是否存在
     if (!fs.existsSync(modulePath)) {
@@ -157,7 +163,7 @@ async function executeModuleFunction(callString) {
     }
     
     // 执行函数
-    const result = module[functionName](...params);
+    const result = await Promise.resolve(module[functionName](...params));
     
     // 存储到数据库
     try {
