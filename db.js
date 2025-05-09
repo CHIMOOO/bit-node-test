@@ -28,19 +28,26 @@ async function readDatabase() {
 
 // 获取最近的记录
 exports.getRecent = async function(limit = 10) {
-  const { db, error } = await readDatabase();
+  const result = await readDatabase();
   
-  if (error) {
-    return `查询错误: ${error}`;
+  if (result.error) {
+    return `查询错误: ${result.error}`;
   }
   
   try {
+    const db = result.db;
     const stmt = db.prepare(`SELECT id, call_string, result FROM calls ORDER BY id DESC LIMIT ?`);
     stmt.bind([limit]);
     
     const results = [];
     while(stmt.step()) {
       const row = stmt.getAsObject();
+      // 尝试解析result字段中的JSON
+      try {
+        row.result = JSON.parse(row.result);
+      } catch (e) {
+        // 如果无法解析，保持原样
+      }
       results.push(row);
     }
     
@@ -53,20 +60,29 @@ exports.getRecent = async function(limit = 10) {
 
 // 根据ID查询记录
 exports.getById = async function(id) {
-  const { db, error } = await readDatabase();
+  const result = await readDatabase();
   
-  if (error) {
-    return `查询错误: ${error}`;
+  if (result.error) {
+    return `查询错误: ${result.error}`;
   }
   
   try {
+    const db = result.db;
     const stmt = db.prepare('SELECT id, call_string, result FROM calls WHERE id = ?');
     stmt.bind([id]);
     
     if (stmt.step()) {
-      const result = stmt.getAsObject();
+      const row = stmt.getAsObject();
       stmt.free();
-      return result;
+      
+      // 尝试解析result字段中的JSON
+      try {
+        row.result = JSON.parse(row.result);
+      } catch (e) {
+        // 如果无法解析，保持原样
+      }
+      
+      return row;
     } else {
       stmt.free();
       return `未找到ID为${id}的记录`;
@@ -78,13 +94,14 @@ exports.getById = async function(id) {
 
 // 查询包含特定字符串的记录
 exports.search = async function(keyword) {
-  const { db, error } = await readDatabase();
+  const result = await readDatabase();
   
-  if (error) {
-    return `查询错误: ${error}`;
+  if (result.error) {
+    return `查询错误: ${result.error}`;
   }
   
   try {
+    const db = result.db;
     const stmt = db.prepare("SELECT id, call_string, result FROM calls WHERE call_string LIKE ? OR result LIKE ?");
     const searchPattern = `%${keyword}%`;
     stmt.bind([searchPattern, searchPattern]);
@@ -92,6 +109,12 @@ exports.search = async function(keyword) {
     const results = [];
     while(stmt.step()) {
       const row = stmt.getAsObject();
+      // 尝试解析result字段中的JSON
+      try {
+        row.result = JSON.parse(row.result);
+      } catch (e) {
+        // 如果无法解析，保持原样
+      }
       results.push(row);
     }
     

@@ -67,8 +67,36 @@ function saveDatabase() {
 async function saveToDatabase(callString, result) {
   return new Promise((resolve, reject) => {
     try {
-      const resultStr = JSON.stringify(result);
+      // 处理复杂对象，避免循环引用
+      let resultStr;
+      try {
+        resultStr = JSON.stringify(result, (key, value) => {
+          // 避免循环引用和函数等无法序列化的内容
+          if (typeof value === 'function') {
+            return '[Function]';
+          }
+          if (value instanceof Error) {
+            return `[Error: ${value.message}]`;
+          }
+          if (typeof value === 'object' && value !== null) {
+            // 避免循环引用
+            const seen = new WeakSet();
+            if (seen.has(value)) {
+              return '[Circular]';
+            }
+            seen.add(value);
+          }
+          return value;
+        }, 2);
+      } catch (jsonError) {
+        console.error('JSON序列化失败:', jsonError);
+        // 简单转换为字符串
+        resultStr = String(result);
+      }
       
+      console.log(`保存记录到数据库: ${callString}, 结果长度: ${resultStr.length}`);
+      
+      // 插入记录
       db.run('INSERT INTO calls (call_string, result) VALUES (?, ?)', 
         [callString, resultStr]);
       
@@ -118,6 +146,7 @@ async function executeModuleFunction(callString) {
     // 首先检查根目录
     if (moduleName === 'db' && fs.existsSync(path.join(__dirname, 'db.js'))) {
       modulePath = path.join(__dirname, 'db.js');
+      console.log('使用根目录中的db.js模块');
     } else {
       // 否则查找scripts目录
       modulePath = path.join(__dirname, 'scripts', `${moduleName}.js`);
@@ -125,8 +154,11 @@ async function executeModuleFunction(callString) {
     
     // 检查模块是否存在
     if (!fs.existsSync(modulePath)) {
+      console.error(`模块 ${moduleName} 不存在, 路径: ${modulePath}`);
       return { error: `模块 ${moduleName} 不存在` };
     }
+    
+    console.log(`加载模块: ${modulePath}`);
     
     // 清除缓存并重新加载模块
     clearModuleCache(modulePath);
@@ -134,6 +166,7 @@ async function executeModuleFunction(callString) {
     
     // 检查函数是否存在
     if (typeof module[functionName] !== 'function') {
+      console.error(`函数 ${functionName} 在模块 ${moduleName} 中不存在`);
       return { error: `函数 ${functionName} 在模块 ${moduleName} 中不存在` };
     }
     
@@ -162,18 +195,30 @@ async function executeModuleFunction(callString) {
       });
     }
     
+    console.log(`执行函数: ${moduleName}.${functionName}(${JSON.stringify(params)})`);
+    
     // 执行函数
-    const result = await Promise.resolve(module[functionName](...params));
+    let result;
+    try {
+      result = await Promise.resolve(module[functionName](...params));
+      console.log(`函数执行成功，结果类型: ${typeof result}`);
+    } catch (execError) {
+      console.error(`执行函数出错: ${execError.message}`);
+      return { error: `执行函数出错: ${execError.message}` };
+    }
     
     // 存储到数据库
     try {
+      console.log(`准备保存结果到数据库`);
       await saveToDatabase(callString, result);
+      console.log(`结果已保存到数据库`);
     } catch (dbError) {
       console.error('保存到数据库失败，但函数执行成功', dbError);
     }
     
     return { success: result };
   } catch (error) {
+    console.error(`执行模块函数时出错: ${error.message}`);
     return { error: error.message };
   }
 }
